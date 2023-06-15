@@ -42,5 +42,4 @@ The `if __name__ == "__main__"` block checks if the script is running directly. 
 - All timestamps are handled in UTC to avoid inconsistencies due to timezones.
 - If any data is missing, the system uses default values (e.g., 'America/Chicago' timezone for a store).
 - The application is designed for a real-time scenario where data gets updated every hour. Reports can be generated as needed based on the updated data.
-- The code handles exceptions during the import process and rolls back any changes in case of an error. It's organized to make the data import, processing, and report generation processes easy to understand.
 - The system is designed to handle complex scenarios involving different time zones, missing data, and interpolation of data based on the status of the stores.
