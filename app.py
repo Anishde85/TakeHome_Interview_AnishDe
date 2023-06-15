@@ -1,7 +1,7 @@
 
 from flask import Flask, jsonify, send_file, make_response
 from flask_sqlalchemy import SQLAlchemy
-from datetime import timedelta, timezone, time
+from datetime import timedelta, timezone, time, datetime
 from threading import Thread
 import uuid
 import pandas as pd
@@ -82,11 +82,9 @@ def import_data():
             start_time_str = row['start_time_local']
             end_time_str = row['end_time_local']
 
-            # Extract hours, minutes, and seconds from the time strings
             start_time_parts = list(map(int, start_time_str.split(':')))
             end_time_parts = list(map(int, end_time_str.split(':')))
 
-            # Create time objects using the extracted values
             start_time_local = time(*start_time_parts)
             end_time_local = time(*end_time_parts)
 
@@ -145,11 +143,11 @@ def generate_report(report_id):
         business_hours = business_hours_dict.get(store.id, [])
 
         uptime_last_hour, downtime_last_hour = calculate_uptime_and_downtime(statuses, business_hours, one_hour_ago,
-                                                                             latest_timestamp_local)
+                                                                             latest_timestamp_local, store_timezone)
         uptime_last_day, downtime_last_day = calculate_uptime_and_downtime(statuses, business_hours, one_day_ago,
-                                                                           latest_timestamp_local)
+                                                                           latest_timestamp_local, store_timezone)
         uptime_last_week, downtime_last_week = calculate_uptime_and_downtime(statuses, business_hours, one_week_ago,
-                                                                             latest_timestamp_local)
+                                                                             latest_timestamp_local, store_timezone)
 
         report[store.id] = [uptime_last_hour, uptime_last_day / 60, uptime_last_week / 60, downtime_last_hour,
                             downtime_last_day / 60, downtime_last_week / 60]
@@ -161,41 +159,59 @@ def generate_report(report_id):
     report_df.to_csv(buffer)
     buffer.seek(0)
 
-    # Save the buffer contents in the database
     report = Report(id=report_id, data=buffer.read())
     db.session.add(report)
     db.session.commit()
 
-
-def calculate_uptime_and_downtime(statuses, business_hours, start_time, end_time):
-
-    return 0,0
+def calculate_uptime_and_downtime(statuses, business_hours, start_time, end_time, timezone):
     uptime = timedelta()
     downtime = timedelta()
+
+    local_tz=pytz.timezone(str(timezone))
+    if start_time.tzinfo is None or start_time.tzinfo.utcoffset(start_time) is None:
+        start_time = local_tz.localize(start_time).astimezone(pytz.utc)
+    else:
+        start_time = start_time.astimezone(pytz.utc)
+
+    if end_time.tzinfo is None or end_time.tzinfo.utcoffset(end_time) is None:
+        end_time = local_tz.localize(end_time).astimezone(pytz.utc)
+    else:
+        end_time = end_time.astimezone(pytz.utc)
+
+    for status in statuses:
+        if status.timestamp_utc.tzinfo is None or status.timestamp_utc.tzinfo.utcoffset(status.timestamp_utc) is None:
+            status.timestamp_utc = local_tz.localize(status.timestamp_utc).astimezone(pytz.utc)
+        else:
+            status.timestamp_utc = status.timestamp_utc.astimezone(pytz.utc)
 
     statuses_in_period = sorted(
         [status for status in statuses if start_time <= status.timestamp_utc <= end_time],
         key=lambda s: s.timestamp_utc)
 
     for business_hour in business_hours:
-        for i in range(len(statuses_in_period) - 1):
-            status_start = max(statuses_in_period[i].timestamp_utc, business_hour.start_time_local)
-            status_end = min(statuses_in_period[i + 1].timestamp_utc, business_hour.end_time_local)
+        
+        start_date = statuses_in_period[0].timestamp_utc.date() if statuses_in_period else None
+        end_date = statuses_in_period[-1].timestamp_utc.date() if statuses_in_period else None
 
-            if status_start < status_end:
-                duration = status_end - status_start
-                if statuses_in_period[i].status == 'active':
-                    uptime += duration
-                else:
-                    downtime += duration
+        if start_date and end_date:
+            start_time_local = local_tz.localize(datetime.combine(start_date, business_hour.start_time_local)).astimezone(pytz.utc)
+            end_time_local = local_tz.localize(datetime.combine(end_date, business_hour.end_time_local)).astimezone(pytz.utc)
+
+            for i in range(len(statuses_in_period) - 1):
+                status_start = max(statuses_in_period[i].timestamp_utc, start_time_local)
+                status_end = min(statuses_in_period[i + 1].timestamp_utc, end_time_local)
+
+                if status_start < status_end:
+                    duration = status_end - status_start
+                    if statuses_in_period[i].status == 'active':
+                        uptime += duration
+                    else:
+                        downtime += duration
 
     uptime_minutes = uptime.total_seconds() / 60
     downtime_minutes = downtime.total_seconds() / 60
 
-    print(uptime_minutes,downtime_minutes)
-
     return uptime_minutes, downtime_minutes
-
 
 @app.route("/get_report/<report_id>", methods=["GET"])
 def get_report(report_id):

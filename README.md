@@ -1,1 +1,46 @@
-# LoopAI_TakeHome
+# Main Components and Functionalities
+
+## Models
+
+The application contains four main models:
+
+- **Store**: Stores the basic details about the stores, like ID and timezone.
+- **StoreStatus**: Stores the status of the store at a particular time.
+- **BusinessHours**: Stores the business hours for each store.
+- **Report**: Stores the generated reports.
+
+## Importing Data
+
+The `import_data` endpoint accepts POST requests. It's used to import data from three CSV files:
+
+- `store.csv`
+- `store_status.csv`
+- `business_hours.csv`
+
+The data from these files populates the `Store`, `StoreStatus`, and `BusinessHours` tables in the SQLite database.
+
+## Generating Reports
+
+The `trigger_report` endpoint triggers the generation of the report. The `generate_report` function executes in a new thread and generates a report for each store, which includes the uptime and downtime for the last hour, day, and week. The report generation process considers only the business hours for calculations. Once the report is generated, it is stored in the `Report` table with a unique report ID.
+
+The `calculate_uptime_and_downtime` function is used to calculate the uptime and downtime for a store within a certain time period. It calculates the uptime and downtime by iterating over each status of the store during the time period and checking if it falls within the store's business hours.
+
+## Fetching Reports
+
+The `get_report` endpoint accepts a report ID and returns the status of the report. If the report generation is complete, it returns the generated report as a CSV file. If the report is still being generated, it returns the status "Running".
+
+## Database Connection
+
+The `engine` and `Session` objects are used to connect to the SQLite database and manage database sessions.
+
+## Main Execution
+
+The `if __name__ == "__main__"` block checks if the script is running directly. If so, it creates all the database tables with the current application context and starts the Flask application.
+
+## Notes
+
+- All timestamps are handled in UTC to avoid inconsistencies due to timezones.
+- If any data is missing, the system uses default values (e.g., 'America/Chicago' timezone for a store).
+- The application is designed for a real-time scenario where data gets updated every hour. Reports can be generated as needed based on the updated data.
+- The code handles exceptions during the import process and rolls back any changes in case of an error. It's organized to make the data import, processing, and report generation processes easy to understand.
+- The system is designed to handle complex scenarios involving different time zones, missing data, and interpolation of data based on the status of the stores.
