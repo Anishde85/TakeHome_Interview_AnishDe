@@ -13,9 +13,9 @@ The application contains four main models:
 
 The `import_data` endpoint accepts POST requests. It's used to import data from three CSV files:
 
-- `store.csv`
-- `store_status.csv`
-- `business_hours.csv`
+- `store.csv` - The CSV that has data about the timezone for the stores.
+- `store_status.csv` - The CSV that has data about whether the store was active or not.  
+- `business_hours.csv` - The CSV that stores the business hours of all the stores.
 
 The data from these files populates the `Store`, `StoreStatus`, and `BusinessHours` tables in the SQLite database.
 
@@ -23,7 +23,7 @@ The data from these files populates the `Store`, `StoreStatus`, and `BusinessHou
 
 The `trigger_report` endpoint triggers the generation of the report. The `generate_report` function executes in a new thread and generates a report for each store, which includes the uptime and downtime for the last hour, day, and week. The report generation process considers only the business hours for calculations. Once the report is generated, it is stored in the `Report` table with a unique report ID.
 
-The `calculate_uptime_and_downtime` function is used to calculate the uptime and downtime for a store within a certain time period. It calculates the uptime and downtime by iterating over each status of the store during the time period and checking if it falls within the store's business hours.
+The `calculate_uptime_and_downtime` function is used to calculate the uptime and downtime for a store within a certain time period. To calculate the uptime and downtime, it first sorts the statues of a particular store by the timestamp, then it adds the duration from the last status to the current status in uptime if the current store status is active, otherwise it adds that duration in downtime.
 
 ## Fetching Reports
 
