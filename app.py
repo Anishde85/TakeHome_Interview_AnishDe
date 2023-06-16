@@ -43,18 +43,17 @@ class BusinessHours(db.Model):
     end_time_local = db.Column(db.Time, nullable=False)
 
 
-# API endpoint for Importing the model
+# API endpoint for importing the data from the csv in the database
 @app.route("/import_data", methods=["POST"])
 def import_data():
     try:
 
-        # Storing the timezones of the stores
         store_statuses = pd.read_csv('store_status.csv')
         business_hours = pd.read_csv('business_hours.csv')
         stores = pd.read_csv('store.csv')
 
+        # Storing the timezones of the stores
         stores['timezone_str'].fillna('America/Chicago', inplace=True)
-
         db.session.query(Store).delete()
         db.session.query(StoreStatus).delete()
         db.session.query(BusinessHours).delete()
