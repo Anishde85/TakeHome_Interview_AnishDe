@@ -33,10 +33,6 @@ The `get_report` endpoint accepts a report ID and returns the status of the repo
 
 The `engine` and `Session` objects are used to connect to the SQLite database and manage database sessions.
 
-## Main Execution
-
-The `if __name__ == "__main__"` block checks if the script is running directly. If so, it creates all the database tables with the current application context and starts the Flask application.
-
 ## Notes
 
 - All timestamps are handled in UTC to avoid inconsistencies due to timezones.
