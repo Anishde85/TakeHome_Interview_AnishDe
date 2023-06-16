@@ -16,6 +16,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 db = SQLAlchemy(app)
 
 
+# DataBase Models
 class Report(db.Model):
     __tablename__ = 'reports'
     id = db.Column(db.String, primary_key=True)
@@ -42,9 +43,12 @@ class BusinessHours(db.Model):
     end_time_local = db.Column(db.Time, nullable=False)
 
 
+# API endpoint for Importing the model
 @app.route("/import_data", methods=["POST"])
 def import_data():
     try:
+
+        # Storing the timezones of the stores
         store_statuses = pd.read_csv('store_status.csv')
         business_hours = pd.read_csv('business_hours.csv')
         stores = pd.read_csv('store.csv')
@@ -59,6 +63,8 @@ def import_data():
             db.session.add(store)
         db.session.commit()
 
+
+        # Storing the store statuses of the stores in local time after converting it from UTC
         store_dict = {store.id: store for store in Store.query.all()}
         for index, row in store_statuses.iterrows():
             timestamp_utc = pd.to_datetime(row['timestamp_utc'])
@@ -74,8 +80,9 @@ def import_data():
             store_status = StoreStatus(store_id=row['store_id'], timestamp_utc=timestamp_utc, status=row['status'])
             db.session.add(store_status)
 
-        business_hours.fillna({"start_time_local": "00:00:00", "end_time_local": "23:59:59"}, inplace=True)
 
+        # Storing the business hours of the stores
+        business_hours.fillna({"start_time_local": "00:00:00", "end_time_local": "23:59:59"}, inplace=True)
         for index, row in business_hours.iterrows():
             store_id = row['store_id']
             day_of_week = row['day']
@@ -104,14 +111,14 @@ def import_data():
 engine = create_engine('sqlite:///database.db', echo=True)
 Session = sessionmaker(bind=engine)
 
-
+# API endpoint to trigger generation of report
 @app.route("/trigger_report", methods=["POST"])
 def trigger_report():
     report_id = str(uuid.uuid4())
     generate_report(report_id)
     return jsonify({"report_id": report_id})
 
-
+# Helper function to generate the report
 def generate_report(report_id):
     stores = Store.query.all()
     latest_timestamp = max(status.timestamp_utc for status in StoreStatus.query.all())
@@ -163,6 +170,7 @@ def generate_report(report_id):
     db.session.add(report)
     db.session.commit()
 
+# Helper function to calculate the uptime and downtime
 def calculate_uptime_and_downtime(statuses, business_hours, start_time, end_time, timezone):
     uptime = timedelta()
     downtime = timedelta()
@@ -213,6 +221,8 @@ def calculate_uptime_and_downtime(statuses, business_hours, start_time, end_time
 
     return uptime_minutes, downtime_minutes
 
+
+# API endpoint to get the report generated
 @app.route("/get_report/<report_id>", methods=["GET"])
 def get_report(report_id):
 
@@ -224,7 +234,6 @@ def get_report(report_id):
         return response
     else:
         return jsonify({"status": "Running"})
-
 
 if __name__ == "__main__":
     with app.app_context():
